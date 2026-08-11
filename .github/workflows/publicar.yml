@@ -1,0 +1,61 @@
+name: Publicar no Instagram
+
+# Horarios em UTC. Brasilia e UTC-3 o ano inteiro (sem horario de verao desde 2019).
+#   11:00 UTC = 08:00 Brasilia  -> post estatico
+#   18:30 UTC = 15:30 Brasilia  -> carrossel
+# O agendador do GitHub pode atrasar alguns minutos em horario de pico.
+on:
+  schedule:
+    - cron: "0 11 * * *"
+    - cron: "30 18 * * *"
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "Slot a publicar (08:00 ou 15:30)"
+        required: true
+        default: "08:00"
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # necessario para comitar publicados.json de volta
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install requests
+
+      - name: Definir o slot
+        id: slot
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "valor=${{ github.event.inputs.slot }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "0 11 * * *" ]; then
+            echo "valor=08:00" >> "$GITHUB_OUTPUT"
+          else
+            echo "valor=15:30" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publicar
+        env:
+          INSTAGRAM_BUSINESS_ID: ${{ secrets.INSTAGRAM_BUSINESS_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+        run: python publicar.py "${{ steps.slot.outputs.valor }}"
+
+      - name: Registrar o que foi publicado
+        run: |
+          if [ -n "$(git status --porcelain publicados.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add publicados.json
+            git commit -m "registro: publicado em $(date -u +%Y-%m-%d) ${{ steps.slot.outputs.valor }}"
+            git push
+          else
+            echo "Nada novo para registrar."
+          fi

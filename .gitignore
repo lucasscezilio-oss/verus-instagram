@@ -1,0 +1,7 @@
+# Nunca versionar credenciais neste repositorio - ele e PUBLICO.
+.env
+*.env
+*credencial*
+*CREDENCIAL*
+*.key
+*.pem
