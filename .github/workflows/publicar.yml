@@ -1,22 +1,26 @@
 name: Publicar no Instagram
 
-# POR QUE TANTOS DISPAROS
-# -----------------------
-# O agendador do GitHub Actions nao e pontual: atrasa em horario de pico e as
-# vezes DESCARTA a execucao. Em 12/08/2026 o disparo das 11:00 UTC nem chegou a
-# ser criado, e o post da manha nao saiu.
+# POR QUE ESTES MINUTOS ESTRANHOS
+# -------------------------------
+# A documentacao do GitHub avisa que execucoes agendadas sao adiadas - ou
+# simplesmente descartadas - em periodos de carga alta, e que "o inicio de cada
+# hora" e o pico. Como todo mundo agenda em :00 e :30, a fila entope justamente
+# ai.
 #
-# Em vez de apostar num disparo unico, roda de 30 em 30 minutos dentro da janela
-# que cobre os dois horarios (08:00 e 15:30 de Brasilia). A primeira execucao que
-# efetivamente rodar publica o que estiver pendente; as seguintes encontram o id
-# em publicados.json e saem sem fazer nada.
+# Em 11 e 12/08/2026 rodaram 2 execucoes de ~40 esperadas, com cron em */30
+# (ou seja, :00 e :30). As duas pecas do dia 12 tiveram que ser publicadas na mao.
+#
+# Agora dispara 4x por hora em minutos deslocados do pico, cobrindo a janela dos
+# dois horarios (08:00 e 15:30 de Brasilia). A primeira execucao que rodar
+# publica o que estiver pendente; as demais encontram o id em publicados.json e
+# saem sem fazer nada.
 #
 # Repositorio publico: minutos de Actions sao gratuitos e ilimitados.
 #
 #   11:00-21:59 UTC = 08:00-18:59 de Brasilia
 on:
   schedule:
-    - cron: "*/30 11-21 * * *"
+    - cron: "7,22,38,53 11-21 * * *"
   workflow_dispatch:
     inputs:
       slot:
