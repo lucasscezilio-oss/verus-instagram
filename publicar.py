@@ -121,22 +121,30 @@ def main() -> None:
     if not IG_ID or not TOKEN:
         sys.exit("ERRO: secrets INSTAGRAM_BUSINESS_ID / INSTAGRAM_ACCESS_TOKEN nao definidos.")
 
-    slot = sys.argv[1] if len(sys.argv) > 1 else ""
-    if slot not in ("08:00", "15:30"):
-        sys.exit(f"ERRO: informe o slot (08:00 ou 15:30). Recebido: {slot!r}")
-
-    hoje = agora_br().strftime("%Y-%m-%d")
+    # Sem argumento, publica a peca de hoje cujo horario ja passou e que ainda
+    # nao foi publicada. E assim porque o agendador do GitHub Actions atrasa e
+    # as vezes DESCARTA execucoes (aconteceu em 12/08/2026: o disparo das 11:00
+    # UTC nem chegou a ser criado). Como o workflow roda vaias vezes ao longo da
+    # janela, qualquer execucao que pegue resolve a pendencia - e as demais
+    # saem sem fazer nada, porque publicados.json ja tem o id.
+    agora = agora_br()
+    hoje = agora.strftime("%Y-%m-%d")
     agenda = json.loads(AGENDA.read_text(encoding="utf-8"))
     ja_publicados = carregar_publicados()
+
+    slot_forcado = sys.argv[1] if len(sys.argv) > 1 else None
 
     candidatos = [
         i
         for i in agenda
-        if i["data"] == hoje and i["horario"] == slot and i["id"] not in ja_publicados
+        if i["data"] == hoje
+        and i["id"] not in ja_publicados
+        and (i["horario"] == slot_forcado if slot_forcado else i["horario"] <= agora.strftime("%H:%M"))
     ]
+    candidatos.sort(key=lambda i: i["horario"])
 
     if not candidatos:
-        print(f"Nada a publicar em {hoje} {slot}. Encerrando sem erro.")
+        print(f"Nada pendente em {hoje} às {agora.strftime('%H:%M')}. Encerrando sem erro.")
         return
 
     item = candidatos[0]
