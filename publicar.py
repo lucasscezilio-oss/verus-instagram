@@ -31,6 +31,12 @@ IG_ID = os.environ.get("INSTAGRAM_BUSINESS_ID", "")
 TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN", "")
 BASE = "https://graph.instagram.com/v19.0"
 
+# Aviso no WhatsApp. Opcional: sem os dois secrets, o script roda igual e so nao avisa.
+# Usa o CallMeBot porque a WhatsApp Business API oficial exige portfolio empresarial
+# aprovado, onboarding que ja falhou uma vez neste projeto. Ver AVISO-WHATSAPP.md.
+ZAP_FONE = os.environ.get("WHATSAPP_PHONE", "")
+ZAP_CHAVE = os.environ.get("WHATSAPP_APIKEY", "")
+
 # Brasilia é UTC-3 o ano inteiro (horario de verao foi extinto em 2019).
 FUSO_BR = timezone(timedelta(hours=-3))
 
@@ -117,6 +123,27 @@ def publicar(container_id: str) -> str:
     return resposta["id"]
 
 
+def avisar(texto: str) -> None:
+    """Manda um aviso no WhatsApp. NUNCA derruba a publicacao.
+
+    Regra de ouro deste arquivo: avisar e acessorio, publicar e o essencial. Se o
+    servico de aviso estiver fora do ar, com chave errada ou lento, o post ja foi
+    e nao pode ser perdido por causa disso. Por isso engole qualquer excecao.
+    """
+    if not ZAP_FONE or not ZAP_CHAVE:
+        print("Aviso de WhatsApp nao configurado, seguindo sem avisar.")
+        return
+    try:
+        requests.get(
+            "https://api.callmebot.com/whatsapp.php",
+            params={"phone": ZAP_FONE, "text": texto, "apikey": ZAP_CHAVE},
+            timeout=15,
+        )
+        print("Aviso enviado no WhatsApp.")
+    except Exception as e:  # noqa: BLE001
+        print(f"Nao consegui avisar no WhatsApp ({e}). Isso nao afeta a publicacao.")
+
+
 def main() -> None:
     if not IG_ID or not TOKEN:
         sys.exit("ERRO: secrets INSTAGRAM_BUSINESS_ID / INSTAGRAM_ACCESS_TOKEN nao definidos.")
@@ -161,6 +188,16 @@ def main() -> None:
 
     marcar_publicado(item["id"])
     print(f"Publicado com sucesso. Post ID: {post_id}")
+
+    primeira_linha = item["legenda"].split("\n")[0][:90]
+    avisor = "carrossel" if len(item["imagens"]) > 1 else "post"
+    avisar(
+        f"Publicado no Instagram agora.\n\n"
+        f"{item['id']}\n"
+        f"{avisor} de {len(item['imagens'])} imagem(ns), agendado para {item['horario']}\n\n"
+        f"\"{primeira_linha}...\"\n\n"
+        f"instagram.com/lucasscez"
+    )
 
 
 if __name__ == "__main__":

@@ -53,6 +53,8 @@ jobs:
         env:
           INSTAGRAM_BUSINESS_ID: ${{ secrets.INSTAGRAM_BUSINESS_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          WHATSAPP_APIKEY: ${{ secrets.WHATSAPP_APIKEY }}
         run: python publicar.py ${{ github.event.inputs.slot }}
 
       - name: Registrar o que foi publicado
@@ -69,3 +71,27 @@ jobs:
           else
             echo "Nada novo para registrar."
           fi
+
+      # POR QUE ESTE PASSO EXISTE
+      # -------------------------
+      # O aviso de sucesso e conveniencia: o post aparece no Instagram de qualquer
+      # jeito. O aviso de FALHA e o que realmente protege, porque falha aqui e
+      # silenciosa. Se o token do Instagram vencer, o workflow quebra, nada e
+      # publicado e nenhum sistema avisa ninguem. Este passo cobre exatamente isso.
+      - name: Avisar no WhatsApp se algo falhou
+        if: failure()
+        env:
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          WHATSAPP_APIKEY: ${{ secrets.WHATSAPP_APIKEY }}
+        run: |
+          if [ -z "$WHATSAPP_PHONE" ] || [ -z "$WHATSAPP_APIKEY" ]; then
+            echo "Aviso de WhatsApp nao configurado. Seguindo."
+            exit 0
+          fi
+          TEXTO="FALHOU a publicacao no Instagram em $(date -u +'%d/%m %H:%M') UTC.
+          A causa mais comum e o token do Instagram ter vencido.
+          Ver: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -G "https://api.callmebot.com/whatsapp.php" \
+            --data-urlencode "phone=$WHATSAPP_PHONE" \
+            --data-urlencode "text=$TEXTO" \
+            --data-urlencode "apikey=$WHATSAPP_APIKEY" > /dev/null || true
